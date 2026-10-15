@@ -130,7 +130,7 @@ def merge_master_playlist():
                 for line in f:
                     if line.startswith("#EXTINF"):
                         # Force group title to "Pluto Streams" in the merged 'All' file
-                        line = re.sub(r'group-title="[^"]*"', 'group-title="Pluto Streams"', line)
+                        line = re.sub(r'group-title="[^"]*"', 'group-title="Fast Pluto"', line)
                         master_content += line
                     elif not line.startswith("#EXTM3U") and line.strip():
                         master_content += line
