@@ -88,7 +88,7 @@ class PlutoProvider(BaseProvider):
                 
                 logo = next((img.get('url') for img in channel.get('images', []) if img.get('type') == 'colorLogoPNG'), "")
                 
-                # Forced category name for all channels
+                # Force all categories to "Fast Pluto"
                 group = "Fast Pluto"
                 
                 sid = str(uuid.uuid4())
@@ -107,4 +107,53 @@ class PlutoProvider(BaseProvider):
         # Uses the specific regional EPG URL in the header as requested
         m3u = f'#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/{self.region}.xml.gz"\n'
         for ch in channels:
-            
+            m3u += f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-logo="{ch["logo"]}" group-title="{ch["group"]}",{ch["name"]}\n'
+            m3u += f'{ch["stream_url"]}\n'
+        return m3u
+
+def merge_master_playlist():
+    """Combines regional files and forces all groups to "Fast Pluto" for the ALL file"""
+    sort_config = {
+        "us": {"priority": 1, "label": "United States"},
+        "ca": {"priority": 2, "label": "Canada"},
+        "gb": {"priority": 3, "label": "United Kingdom"},
+        "fr": {"priority": 4, "label": "France"},
+        "de": {"priority": 5, "label": "Germany"},
+        "es": {"priority": 6, "label": "Spain"},
+        "it": {"priority": 7, "label": "Italy"},
+        "mx": {"priority": 8, "label": "Mexico"},
+        "br": {"priority": 9, "label": "Brazil"},
+        "ar": {"priority": 10, "label": "Argentina"},
+        "cl": {"priority": 11, "label": "Chile"},
+        "no": {"priority": 12, "label": "Norway"},
+        "se": {"priority": 13, "label": "Sweden"},
+        "dk": {"priority": 14, "label": "Denmark"},
+    }
+
+    files = [f for f in glob.glob("pluto_*.m3u") if "all.m3u" not in f and "master.m3u" not in f]
+    sorted_files = sorted(files, key=lambda x: sort_config.get(x.replace("pluto_", "").replace(".m3u", ""), {}).get("priority", 99))
+    
+    # Master file uses the 'all.xml.gz' guide
+    master_content = '#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/all.xml.gz"\n'
+    for file in sorted_files:
+        if os.path.exists(file):
+            with open(file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("#EXTINF"):
+                        # Force group to "Fast Pluto" in the 'All' file
+                        line = re.sub(r'group-title="[^"]*"', 'group-title="Fast Pluto"', line)
+                        master_content += line
+                    elif not line.startswith("#EXTM3U") and line.strip():
+                        master_content += line
+                    
+    with open("pluto_all.m3u", "w", encoding="utf-8") as f:
+        f.write(master_content)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--merge":
+        merge_master_playlist()
+    else:
+        provider = PlutoProvider()
+        channels = provider.get_channels()
+        with open(f"pluto_{provider.region}.m3u", "w", encoding="utf-8") as f:
+            f.write(provider.generate_m3u(channels))
