@@ -31,9 +31,9 @@ class PlutoProvider(BaseProvider):
         
         # Optimized IPs from official source to fix freezing/commercial issues
         self.x_forward = {
-            "us": "45.50.96.71", "gb": "51.89.255.67", "ca": "23.227.38.65", 
-            "fr": "51.210.0.1", "de": "91.107.201.140", "es": "82.98.134.10", 
-            "it": "79.137.44.85", "br": "177.192.255.38", "mx": "200.68.128.83", 
+            "us": "185.236.200.172", "gb": "84.17.50.173", "ca": "192.206.151.131", 
+            "fr": "176.31.84.249", "de": "217.94.184.66", "es": "88.26.241.248", 
+            "it": "131.114.130.239", "br": "177.192.255.38", "mx": "200.68.128.83", 
             "ar": "168.226.232.228", "cl": "181.200.138.240", "no": "78.26.38.103", 
             "se": "185.6.8.2", "dk": "192.36.27.7",
         }
@@ -87,14 +87,16 @@ class PlutoProvider(BaseProvider):
                 if not channel_id or not name: continue
                 
                 logo = next((img.get('url') for img in channel.get('images', []) if img.get('type') == 'colorLogoPNG'), "")
-                group = "Pluto Streams"
+                
+                # Forced category name for all channels
+                group = "Fast Pluto"
                 
                 sid = str(uuid.uuid4())
                 quality_suffix = (f"&quality=720p&deviceMake=chrome&deviceType=web&deviceModel=web"
                                   f"&deviceVersion=133.0.0&architecture=x86_64&buildVersion=1.0.0"
                                   f"&includeExtendedEvents=true&masterJWTPassthrough=true")
 
-                stream_url = (f"https://cfd-v4-service-channel-stitcher-use1-1.prd.pluto.tv/v2/stitch/hls/channel/{channel_id}/master.m3u8"
+                stream_url = (f"https://ipv4.pluto.tv/api/tn/video/playout/v2/stitch/hls/channel/{channel_id}/master.m3u8"
                               f"?{self.stitcher_params}&jwt={token}{quality_suffix}")
                 
                 processed_channels.append({'id': str(channel_id), 'name': name, 'stream_url': stream_url, 'logo': logo, 'group': group})
@@ -105,44 +107,4 @@ class PlutoProvider(BaseProvider):
         # Uses the specific regional EPG URL in the header as requested
         m3u = f'#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/{self.region}.xml.gz"\n'
         for ch in channels:
-            m3u += f'#EXTINF:-1 tvg-id="{ch["id"]}" tvg-logo="{ch["logo"]}" group-title="{ch["group"]}",{ch["name"]}\n'
-            m3u += f'{ch["stream_url"]}\n'
-        return m3u
-
-def merge_master_playlist():
-    """Combines regional files and sets all categories to 'Pluto Streams' for the ALL file"""
-    sort_config = {
-        "us": {"priority": 1}, "ca": {"priority": 2}, "gb": {"priority": 3},
-        "fr": {"priority": 4}, "de": {"priority": 5}, "es": {"priority": 6},
-        "it": {"priority": 7}, "mx": {"priority": 8}, "br": {"priority": 9},
-        "ar": {"priority": 10}, "cl": {"priority": 11}, "no": {"priority": 12},
-        "se": {"priority": 13}, "dk": {"priority": 14},
-    }
-
-    files = [f for f in glob.glob("pluto_*.m3u") if "all.m3u" not in f and "master.m3u" not in f]
-    sorted_files = sorted(files, key=lambda x: sort_config.get(x.replace("pluto_", "").replace(".m3u", ""), {}).get("priority", 99))
-    
-    # Master file uses the 'all.xml.gz' guide
-    master_content = '#EXTM3U url-tvg="https://github.com/matthuisman/i.mjh.nz/raw/master/PlutoTV/all.xml.gz"\n'
-    for file in sorted_files:
-        if os.path.exists(file):
-            with open(file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("#EXTINF"):
-                        # Force group title to "Pluto Streams" in the merged 'All' file
-                        line = re.sub(r'group-title="[^"]*"', 'group-title="Fast Pluto"', line)
-                        master_content += line
-                    elif not line.startswith("#EXTM3U") and line.strip():
-                        master_content += line
-                    
-    with open("pluto_all.m3u", "w", encoding="utf-8") as f:
-        f.write(master_content)
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--merge":
-        merge_master_playlist()
-    else:
-        provider = PlutoProvider()
-        channels = provider.get_channels()
-        with open(f"pluto_{provider.region}.m3u", "w", encoding="utf-8") as f:
-            f.write(provider.generate_m3u(channels))
+            
